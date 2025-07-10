@@ -10,6 +10,8 @@
 
 一个革命性的轻量级GUI，可完全基于CPU运行强大的AI模型 - 无需GPU！适合任何电脑，从轻薄笔记本到企业电脑。
 
+<img width="1040" height="807" alt="mO-1" src="https://github.com/user-attachments/assets/cfe28cac-fcea-41b1-b088-8079db617f27" />
+
 
 ## 核心特性
 
@@ -46,6 +48,9 @@
 | **启动时间** | <3秒 | 无需漫长GPU初始化，即时访问AI |
 | **模型大小** | 0.5-1.5GB | 为CPU推理优化的紧凑而强大的模型 |
 | **最低内存** | 4GB | 推荐用于大模型流畅运行 |
+
+
+<img width="1040" height="807" alt="mO-2c" src="https://github.com/user-attachments/assets/01e27887-b4af-4b96-b1a0-dadceebe1291" />
 
 
 ## 使用场景 - 纯CPU AI革命
