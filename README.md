@@ -1,4 +1,4 @@
-# MiniOllama （AI Power）
+# MiniOllama （AI Power）【中文](https://github.com/hengruiyun/Mini-Ollama/blob/main/README_CN.md)
 
 ## Acknowledgments
 
@@ -10,6 +10,7 @@ This project is built upon the foundation of Ollama, an incredible open-source p
 
 A revolutionary lightweight GUI for running powerful AI models completely CPU-only - no GPU required! Perfect for any Windows computer, from budget laptops to enterprise workstations.
 
+<img width="1040" height="807" alt="mO-1" src="https://github.com/user-attachments/assets/cfe28cac-fcea-41b1-b088-8079db617f27" />
 
 ## Key Features
 
