@@ -1,4 +1,4 @@
-# MiniOllama （AI Power）[中文](https://github.com/hengruiyun/Mini-Ollama/blob/main/README_CN.md)
+# Mini Ollama （AI Power）[中文](https://github.com/hengruiyun/Mini-Ollama/blob/main/README_CN.md)
 
 ## Acknowledgments
 
