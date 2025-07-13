@@ -1,11 +1,8 @@
 # Mini Ollama （AI Power）[中文](https://github.com/hengruiyun/Mini-Ollama/blob/main/README_CN.md)
 
-## Acknowledgments
-
-**Special thanks to the [Ollama Team](https://github.com/ollama/ollama) for creating this amazing AI platform!**
-
 This project is built upon the foundation of Ollama, an incredible open-source platform that makes running AI models locally accessible to everyone. Without their innovative work, MiniOllama would not exist. We are grateful for their dedication to democratizing AI technology and making it available to developers and users worldwide.
 
+**Special thanks to the [Ollama Team](https://github.com/ollama/ollama) for creating this amazing AI platform!**
 ---
 <img width="1040" height="740" alt="moe-1" src="https://github.com/user-attachments/assets/ed3e7fec-cf5b-4364-b313-c00eba00e8ba" />
 
