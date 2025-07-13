@@ -7,10 +7,11 @@
 This project is built upon the foundation of Ollama, an incredible open-source platform that makes running AI models locally accessible to everyone. Without their innovative work, MiniOllama would not exist. We are grateful for their dedication to democratizing AI technology and making it available to developers and users worldwide.
 
 ---
+<img width="1040" height="740" alt="moe-1" src="https://github.com/user-attachments/assets/ed3e7fec-cf5b-4364-b313-c00eba00e8ba" />
+
 
 A revolutionary lightweight GUI for running powerful AI models completely CPU-only - no GPU required! Perfect for any Windows computer, from budget laptops to enterprise workstations.
 
-<img width="1040" height="807" alt="mO-1" src="https://github.com/user-attachments/assets/cfe28cac-fcea-41b1-b088-8079db617f27" />
 
 ## Key Features
 
@@ -47,6 +48,8 @@ A revolutionary lightweight GUI for running powerful AI models completely CPU-on
 | **Startup Time** | <3 seconds | Instant AI access without lengthy GPU initialization |
 | **Model Size** | 0.5-1.5GB | Compact yet powerful models optimized for CPU inference |
 | **Minimum RAM** | 4GB | Recommended for smooth large model operation |
+
+<img width="1040" height="740" alt="moe-2" src="https://github.com/user-attachments/assets/4c4e8216-48d3-4fb1-b8fb-086627a6e5bc" />
 
 
 ## Use Cases - CPU-Only AI Revolution
