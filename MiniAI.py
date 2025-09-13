@@ -3,11 +3,11 @@
 """
 MiniAI - PyQt5 Version
 Author: 267278466@qq.com
-Version: 2.0.0
+Version: 2.1.0
 """
 
 # 版本信息
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 import os
 import sys
@@ -17,6 +17,9 @@ import threading
 import subprocess
 import requests
 from pathlib import Path
+# 禁用SSL警告
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import winreg
 from datetime import datetime, date
 import webbrowser
@@ -29,7 +32,7 @@ from bs4 import BeautifulSoup
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QTabWidget, QLabel, QPushButton, QCheckBox, QComboBox, QLineEdit,
-    QTextEdit, QListWidget, QTreeWidget, QTreeWidgetItem, QProgressBar,
+    QTextEdit, QTextBrowser, QListWidget, QTreeWidget, QTreeWidgetItem, QProgressBar,
     QGroupBox, QGridLayout, QFormLayout, QMessageBox, QFileDialog,
     QSplitter, QFrame, QScrollArea, QSpacerItem, QSizePolicy
 )
@@ -152,7 +155,7 @@ class ChatThread(QThread):
             filtered_history = []
             for entry in self.chat_history:
                 sender = entry.get('sender', '')
-                if sender in ['用户', '助手', '助手(联网增强)', 'user', 'assistant']:
+                if sender in ['我', 'AI 助手', 'AI 助手(联网增强)', 'user', 'assistant']:
                     filtered_history.append(entry)
             
             # 获取最近10条记录（5个回合，每个回合包含用户问题和助手回答）
@@ -215,6 +218,13 @@ class AnswerReviewThread(QThread):
             print(f"[DEBUG] 原始问题: {self.original_question}")
             print(f"[DEBUG] 回答长度: {len(self.answer)} 字符")
             
+            # 优先检查：时间相关问题直接设置可信度为0，触发联网搜索
+            if self.is_time_related_question(self.original_question):
+                review_result = "检测到时间相关问题，直接设置可信度为0，触发联网搜索获取最新时间信息。"
+                print(f"[DEBUG] 时间相关问题优先处理: {review_result}")
+                self.review_completed.emit(True, 0.0, review_result)
+                return
+            
             # 检查是否为简单问候语，如果是则直接通过
             if self.is_simple_greeting(self.original_question):
                 review_result = "检测到简单问候语，直接通过审查。"
@@ -239,10 +249,12 @@ class AnswerReviewThread(QThread):
             # 检查回答中是否包含时间信息
             time_confidence_score = self.check_time_related_content(self.answer)
             print(f"[DEBUG] 时间检测结果: {time_confidence_score}")
+            print(f"[DEBUG] 被检测的回答内容: {self.answer[:200]}...")
             
             if time_confidence_score == 0:
                 # 如果检测到时间相关内容且在5年内，直接设置可信度为0
                 review_result = f"检测到回答中包含时间信息且与当前日期相差在5年内，可信度设置为0。需要联网搜索最新信息。"
+                print(f"[DEBUG] 强制设置可信度为0，触发联网搜索")
                 self.review_completed.emit(True, 0.0, review_result)
                 return
             
@@ -326,6 +338,61 @@ class AnswerReviewThread(QThread):
             
         except Exception as e:
             print(f"问候语检测出错: {e}")
+            return False
+    
+    def is_time_related_question(self, question):
+        """判断是否为时间相关问题，需要实时信息"""
+        try:
+            question_lower = question.lower().strip()
+            print(f"[DEBUG] 检查时间相关问题: {question}")
+            
+            # 时间查询的关键词
+            time_keywords = [
+                # 直接时间询问
+                '今天', '明天', '昨天', '现在', '当前',
+                '今日', '明日', '昨日', '本日', '今晚',
+                
+                # 日期询问
+                '日期', '几号', '号数', '多少号',
+                '年月日', '月份', '年份',
+                
+                # 时间询问
+                '时间', '几点', '点钟', '现在时间',
+                '当前时间', '现在几点', '什么时候',
+                
+                # 星期询问
+                '星期', '礼拜', '周几', '星期几',
+                '礼拜几', '今天星期', '今天礼拜',
+                
+                # 时间状态
+                '现在是', '今天是', '当前是',
+                '现在几', '今天几', '当前几'
+            ]
+            
+            # 检查关键词匹配
+            for keyword in time_keywords:
+                if keyword in question_lower:
+                    print(f"[DEBUG] 匹配时间关键词: {keyword}")
+                    return True
+            
+            # 检查时间相关的句式模式
+            time_patterns = [
+                r'.*今天.*', r'.*现在.*', r'.*当前.*',
+                r'.*几号.*', r'.*几点.*', r'.*星期.*',
+                r'.*日期.*', r'.*时间.*', r'.*礼拜.*'
+            ]
+            
+            import re
+            for pattern in time_patterns:
+                if re.match(pattern, question_lower):
+                    print(f"[DEBUG] 匹配时间模式: {pattern}")
+                    return True
+            
+            print(f"[DEBUG] 不是时间相关问题")
+            return False
+            
+        except Exception as e:
+            print(f"时间问题检测出错: {e}")
             return False
     
     def is_intellectual_question(self, question):
@@ -643,6 +710,8 @@ class AnswerReviewThread(QThread):
             # 检查具体年份
             for pattern in time_patterns:
                 matches = re.findall(pattern, text)
+                if matches:
+                    print(f"[DEBUG] 模式 '{pattern}' 匹配到: {matches}")
                 for match in matches:
                     if isinstance(match, tuple):
                         # 处理元组（如时间范围）
@@ -700,7 +769,7 @@ class AnswerReviewThread(QThread):
 
 
 class WebSearchThread(QThread):
-    """网络搜索线程"""
+    """server.py搜索线程"""
     search_completed = pyqtSignal(str)  # 搜索结果
     error_occurred = pyqtSignal(str)
     
@@ -711,82 +780,126 @@ class WebSearchThread(QThread):
         self.search_results = ""
         
     def run(self):
+        """使用server.py进行搜索"""
         try:
-            # 构建百度搜索URL
-            encoded_query = urllib.parse.quote(self.query)
-            search_url = f"https://www.baidu.com/s?wd={encoded_query}"
+            print(f"DEBUG: 开始搜索: {self.query}")
             
-            # 使用requests获取搜索结果页面
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            
-            response = requests.get(search_url, headers=headers, timeout=10)
-            response.encoding = 'utf-8'
-            
-            if response.status_code == 200:
-                # 解析搜索结果页面
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # 提取搜索结果链接
-                links = []
-                for result in soup.find_all('h3', class_='t'):
-                    link_elem = result.find('a')
-                    if link_elem and link_elem.get('href'):
-                        title = result.get_text().strip()
-                        url = link_elem.get('href')
-                        if url.startswith('http'):
-                            links.append({'title': title, 'url': url})
-                
-                # 获取前5个链接的内容
-                content_list = []
-                for i, link in enumerate(links[:5]):
-                    try:
-                        content = self.get_page_content(link['url'])
-                        if content:
-                            content_list.append(f"来源{i+1}: {link['title']}\n内容: {content[:1000]}...")
-                    except:
-                        continue
-                
-                if content_list:
-                    self.search_results = "\n\n".join(content_list)
-                    self.search_completed.emit(self.search_results)
-                else:
-                    self.error_occurred.emit("未能获取到有效的搜索结果内容")
+            # 调用server.py的搜索功能
+            search_result = self.search_with_server()
+            if search_result:
+                print(f"DEBUG: server.py搜索成功")
+                self.search_completed.emit(search_result)
             else:
-                self.error_occurred.emit(f"搜索请求失败: {response.status_code}")
+                self.error_occurred.emit("server.py搜索失败")
                 
         except Exception as e:
-            self.error_occurred.emit(f"网络搜索失败: {e}")
+            print(f"DEBUG: 搜索异常: {e}")
+            self.error_occurred.emit(f"搜索失败: {e}")
+    
+    def search_with_server(self):
+        """使用简化的搜索接口进行搜索"""
+        try:
+            import asyncio
+            import os
+            
+            # 设置环境变量
+            os.environ['SEARXNG_API_URL'] = 'https://searx.bndkt.io'
+            
+            print(f"DEBUG: 执行简化搜索: {self.query}")
+            
+            # 直接调用simple_search模块
+            try:
+                import simple_search
+                
+                # 创建事件循环并执行异步搜索
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                try:
+                    search_result = loop.run_until_complete(
+                        simple_search.perform_search(
+                            query=self.query,
+                            category="general",
+                            language="auto",
+                            safe_search=1,
+                            time_range="",
+                            output_format="html"
+                        )
+                    )
+                    
+                    if search_result and search_result.strip():
+                        print(f"DEBUG: 简化搜索成功，结果长度: {len(search_result)}")
+                        return search_result
+                    else:
+                        print("DEBUG: 搜索结果为空")
+                        return None
+                        
+                finally:
+                    loop.close()
+                    
+            except ImportError as e:
+                print(f"DEBUG: 无法导入simple_search模块: {e}")
+                return None
+                
+        except Exception as e:
+            print(f"DEBUG: 简化搜索异常: {e}")
+            return None
+    
     
     def get_page_content(self, url):
         """获取网页内容"""
         try:
+            print(f"DEBUG: 尝试获取页面内容: {url[:100]}...")
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.3',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive',
             }
-            response = requests.get(url, headers=headers, timeout=5)
-            response.encoding = 'utf-8'
+            response = requests.get(url, headers=headers, timeout=8, allow_redirects=True)
             
             if response.status_code == 200:
+                # 尝试自动检测编码
+                response.encoding = response.apparent_encoding or 'utf-8'
+                
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
                 # 移除脚本和样式标签
-                for script in soup(["script", "style"]):
+                for script in soup(["script", "style", "noscript"]):
                     script.decompose()
                 
-                # 获取文本内容
-                text = soup.get_text()
+                # 尝试获取主要内容区域
+                content = ""
+                
+                # 方法1: 查找常见的内容容器
+                main_content = soup.find('div', class_=['content', 'main', 'article', 'post'])
+                if main_content:
+                    content = main_content.get_text()
+                else:
+                    # 方法2: 获取body内容
+                    body = soup.find('body')
+                    if body:
+                        content = body.get_text()
+                    else:
+                        # 方法3: 获取所有文本
+                        content = soup.get_text()
                 
                 # 清理文本
-                lines = (line.strip() for line in text.splitlines())
+                lines = (line.strip() for line in content.splitlines())
                 chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-                text = ' '.join(chunk for chunk in chunks if chunk)
+                text = ' '.join(chunk for chunk in chunks if chunk and len(chunk) > 3)
                 
-                return text[:2000]  # 限制长度
+                # 过滤掉过短的内容
+                if len(text) < 50:
+                    return ""
+                
+                return text[:1500]  # 限制长度
+            else:
+                print(f"DEBUG: 页面请求失败，状态码: {response.status_code}")
             
-        except:
-            pass
+        except Exception as e:
+            print(f"DEBUG: 获取页面内容异常: {e}")
         
         return ""
 
@@ -879,7 +992,7 @@ class EnhancedAnswerThread(QThread):
             filtered_history = []
             for entry in self.chat_history:
                 sender = entry.get('sender', '')
-                if sender in ['用户', '助手', '助手(联网增强)', 'user', 'assistant']:
+                if sender in ['我', 'AI 助手', 'AI 助手(联网增强)', 'user', 'assistant']:
                     filtered_history.append(entry)
             
             # 获取最近10条记录（5个回合，每个回合包含用户问题和助手回答）
@@ -946,6 +1059,9 @@ class OllamaSettingsQt(QMainWindow):
         
         # 聊天消息列表（用于WebView）
         self.chat_messages = []
+        
+        # 检查是否有本地模型，如果没有则提示下载
+        QTimer.singleShot(1000, self.check_and_prompt_for_models)  # 延迟1秒执行，确保界面完全加载
     
     def auto_check_and_start_ollama(self):
         """自动检查并启动Ollama服务"""
@@ -1225,17 +1341,54 @@ class OllamaSettingsQt(QMainWindow):
             return text
     
     def check_search_engine_connectivity(self):
-        """检查搜索引擎连通性"""
+        """检查简化搜索服务连通性"""
         try:
-            # 尝试访问百度首页
-            response = requests.get("https://www.baidu.com", timeout=5)
-            if response.status_code == 200:
-                return True
-            else:
-                print(f"搜索引擎连通性检查失败: HTTP {response.status_code}")
+            import os
+            import asyncio
+            
+            # 设置环境变量
+            os.environ['SEARXNG_API_URL'] = 'https://searx.bndkt.io'
+            
+            # 测试simple_search模块
+            try:
+                import simple_search
+                print("simple_search模块导入成功")
+                
+                # 测试搜索功能
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                try:
+                    result = loop.run_until_complete(
+                        simple_search.perform_search(
+                            query="test",
+                            category="general",
+                            language="auto",
+                            safe_search=1,
+                            time_range="",
+                            output_format="html"
+                        )
+                    )
+                    
+                    if result and result.strip():
+                        print("简化搜索服务连通性检查成功")
+                        return True
+                    else:
+                        print("搜索测试返回空结果")
+                        return False
+                        
+                finally:
+                    loop.close()
+                    
+            except ImportError as e:
+                print(f"simple_search模块导入失败: {e}")
                 return False
+            except Exception as e:
+                print(f"简化搜索连通性检查异常: {e}")
+                return False
+                
         except Exception as e:
-            print(f"搜索引擎连通性检查失败: {e}")
+            print(f"搜索服务连通性检查失败: {e}")
             return False
     
     def init_chat_html(self):
@@ -1415,9 +1568,9 @@ class OllamaSettingsQt(QMainWindow):
                     'input_placeholder': '输入您的消息... (Ctrl+Enter发送)'
                 },
                 'chat': {
-                    'system': '系统',
-                    'user': '用户',
-                    'assistant': '助手',
+                    'system': 'AI 系统',
+                    'user': '我',
+                    'assistant': 'AI 助手',
                     'welcome_message': '欢迎使用MiniAI！请选择一个模型开始对话。'
                 }
             },
@@ -1989,16 +2142,28 @@ class OllamaSettingsQt(QMainWindow):
             # 初始化HTML内容
             self.init_chat_html()
         else:
-            # 回退到QTextEdit
-            self.chat_display = QTextEdit()
+            # 回退到QTextBrowser（支持链接点击）
+            self.chat_display = QTextBrowser()
             self.chat_display.setMinimumHeight(300)
             self.chat_display.setReadOnly(True)
-            self.chat_display.setAcceptRichText(True)  # 支持富文本
-            # 只对QTextEdit设置滚动条策略和样式
+            self.chat_display.setOpenExternalLinks(True)  # QTextBrowser支持此方法
+            # 设置文档模式支持HTML，确保不覆盖内联样式
+            self.chat_display.document().setDefaultStyleSheet("""
+                body { 
+                    font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; 
+                    font-size: 14px; 
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 8px;
+                    background-color: #fafafa;
+                }
+                p { margin: 0; padding: 0; }
+            """)
+            # 设置QTextBrowser的滚动条策略和样式
             self.chat_display.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
             self.chat_display.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             self.chat_display.setStyleSheet("""
-                QTextEdit {
+                QTextBrowser {
                     border: 2px solid #e1e1e1;
                     border-radius: 12px;
                     background: linear-gradient(to bottom, #ffffff, #f8f9fa);
@@ -2112,7 +2277,8 @@ class OllamaSettingsQt(QMainWindow):
         send_shortcut.activated.connect(self.send_message)
         
         # 初始化聊天
-        self.add_chat_message(self.get_text("system", "chat"), self.get_text("welcome_message", "chat"))
+        welcome_msg = self.get_text("welcome_message", "chat")
+        self.add_chat_message(self.get_text("system", "chat"), welcome_msg)
     
     def setup_model_tab(self):
         """设置模型管理标签页"""
@@ -2543,6 +2709,176 @@ class OllamaSettingsQt(QMainWindow):
         else:
             self.update_status("未找到本地模型，请先下载模型")
     
+    def check_and_prompt_for_models(self):
+        """检查本地模型列表，如果为空则提示用户下载"""
+        try:
+            # 获取当前本地模型数量
+            model_count = self.local_models_list.count()
+            
+            if model_count == 0:
+                # 检查Ollama服务是否运行
+                if not self.check_ollama_status():
+                    return  # 如果服务未运行，不提示下载
+                
+                # 显示下载提示对话框
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle(self.get_text("no_models_title", "dialogs"))
+                msg_box.setText(self.get_text("no_models_message", "dialogs"))
+                msg_box.setIcon(QMessageBox.Question)
+                
+                # 添加自定义按钮
+                download_btn = msg_box.addButton(self.get_text("download_now", "dialogs"), QMessageBox.YesRole)
+                later_btn = msg_box.addButton(self.get_text("download_later", "dialogs"), QMessageBox.NoRole)
+                
+                msg_box.setDefaultButton(download_btn)
+                msg_box.exec_()
+                
+                # 检查用户选择
+                if msg_box.clickedButton() == download_btn:
+                    self.auto_download_qwen_model()
+                    
+        except Exception as e:
+            print(f"检查模型时出错: {e}")
+    
+    def auto_download_qwen_model(self):
+        """自动下载qwen3:0.6b模型或运行安装脚本"""
+        try:
+            # 首先检查是否存在安装脚本
+            if self.check_and_run_install_scripts():
+                # 如果运行了安装脚本，则功能结束
+                return
+            
+            # 如果没有安装脚本或脚本不适合当前系统，则切换到模型管理页面下载
+            self.download_qwen_from_model_tab()
+                    
+        except Exception as e:
+            print(f"自动下载模型时出错: {e}")
+            QMessageBox.warning(
+                self, 
+                self.get_text("warning", "dialogs"),
+                f"自动下载失败: {e}\n请手动选择模型下载。"
+            )
+    
+    def check_and_run_install_scripts(self):
+        """检查并运行安装脚本，返回是否成功运行了脚本"""
+        import platform
+        current_os = platform.system().lower()
+        
+        # 定义可能的安装脚本文件
+        install_files = [
+            "InstOlla.exe",
+            "InstallOllama.bat", 
+            "InstallOllama.sh"
+        ]
+        
+        # 检查文件是否存在
+        existing_files = []
+        for file_name in install_files:
+            file_path = Path(file_name)
+            if file_path.exists():
+                existing_files.append((file_name, file_path))
+        
+        if not existing_files:
+            print("未找到安装脚本文件")
+            return False
+        
+        # 根据系统类型选择合适的脚本运行
+        script_to_run = None
+        
+        if current_os == "windows":
+            # Windows系统：优先选择.exe，然后是.bat
+            for file_name, file_path in existing_files:
+                if file_name.endswith('.exe'):
+                    script_to_run = (file_name, file_path)
+                    break
+            
+            if not script_to_run:
+                for file_name, file_path in existing_files:
+                    if file_name.endswith('.bat'):
+                        script_to_run = (file_name, file_path)
+                        break
+        
+        elif current_os in ["darwin", "linux"]:  # macOS or Linux
+            # macOS/Linux系统：选择.sh脚本
+            for file_name, file_path in existing_files:
+                if file_name.endswith('.sh'):
+                    script_to_run = (file_name, file_path)
+                    break
+        
+        if not script_to_run:
+            print(f"未找到适合当前系统({current_os})的安装脚本")
+            return False
+        
+        # 运行选中的脚本
+        try:
+            script_name, script_path = script_to_run
+            print(f"正在运行安装脚本: {script_name}")
+            
+            if current_os == "windows":
+                if script_name.endswith('.exe'):
+                    # 运行exe文件
+                    subprocess.Popen([str(script_path)], 
+                                   creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                elif script_name.endswith('.bat'):
+                    # 运行bat文件
+                    subprocess.Popen([str(script_path)], 
+                                   shell=True,
+                                   creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+            else:
+                # macOS/Linux运行sh脚本
+                # 确保脚本有执行权限
+                import stat
+                script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
+                subprocess.Popen(['/bin/bash', str(script_path)])
+            
+            self.update_status(f"已启动安装脚本: {script_name}")
+            QMessageBox.information(
+                self,
+                self.get_text("info", "dialogs"),
+                f"已启动安装脚本: {script_name}\n安装过程将在后台运行。"
+            )
+            return True
+            
+        except Exception as e:
+            print(f"运行安装脚本失败: {e}")
+            QMessageBox.warning(
+                self,
+                self.get_text("warning", "dialogs"),
+                f"运行安装脚本失败: {e}\n将切换到模型管理页面手动下载。"
+            )
+            return False
+    
+    def download_qwen_from_model_tab(self):
+        """从模型管理标签页下载qwen3:1.7b模型"""
+        try:
+            # 切换到模型管理标签页
+            self.tab_widget.setCurrentIndex(1)  # 模型管理是第二个标签页(索引1)
+            
+            # 在可下载模型列表中查找并选择qwen3:1.7b
+            target_model = "qwen3:1.7b"
+            
+            for i in range(self.downloadable_models_tree.topLevelItemCount()):
+                item = self.downloadable_models_tree.topLevelItem(i)
+                if item.text(0) == target_model:
+                    # 选择该项
+                    self.downloadable_models_tree.setCurrentItem(item)
+                    item.setSelected(True)
+                    
+                    # 开始下载
+                    self.download_model()
+                    break
+            else:
+                # 如果没找到qwen3:1.7b，提示用户手动选择
+                QMessageBox.information(
+                    self, 
+                    self.get_text("info", "dialogs"),
+                    "未找到qwen3:1.7b模型，请手动选择其他模型下载。"
+                )
+                    
+        except Exception as e:
+            print(f"从模型管理页面下载模型时出错: {e}")
+            raise e
+    
     def load_downloadable_models(self):
         """从JSON文件加载可下载模型数据"""
         try:
@@ -2561,10 +2897,13 @@ class OllamaSettingsQt(QMainWindow):
             print(f"读取可下载模型数据失败: {e}")
             # 使用内置的固定数据作为回退
             online_models = [
-                {"name": "llama3.2:1b", "size": "1.3GB", "description": "Llama 3.2 1B"},
-                {"name": "deepseek-r1:1.5b", "size": "1.1GB", "description": "DeepSeek R1 1.5B"},
-                {"name": "gemma3:1b", "size": "0.8GB", "description": "Gemma 3 1B"},
-                {"name": "qwen3:1.7b", "size": "1.4GB", "description": "Qwen3 1.7B"}
+                {"name": "qwen3:0.6b", "size": "0.5GB", "description": "Qwen3 0.6B"},
+                {"name": "qwen3:1.7b", "size": "1.4GB", "description": "Qwen3 1.7B"},
+                {"name": "gemma3:4b", "size": "3.3GB", "description": "Gemma3 4B"},
+                {"name": "qwen3:4b", "size": "2.5GB", "description": "Qwen3 4B"},
+                {"name": "gemma3:12b", "size": "8.1GB", "description": "Gemma3 12B"},
+                {"name": "qwen3:14b", "size": "9.3GB", "description": "Qwen3 14B"},
+                {"name": "gpt-oss:20b", "size": "14GB", "description": "OpenAI GPT-oss"}
             ]
         
         # 清空现有项目
@@ -2720,7 +3059,7 @@ class OllamaSettingsQt(QMainWindow):
                 self.search_thread.start()
             else:
                 # 搜索引擎不可用，直接显示LLM的回复
-                self.add_chat_message("系统", "网络连接不可用，显示离线回答")
+                self.add_chat_message("AI 系统", "网络连接不可用，显示离线回答")
                 enhanced_reply = f"{self.pending_reply} <small style='color: #666; font-size: 11px;'>(离线回答，可信度: {confidence_score:.1f}%)</small>"
                 self.add_chat_message(self.get_text("assistant", "chat"), enhanced_reply)
                 self.update_status("就绪")
@@ -2746,12 +3085,12 @@ class OllamaSettingsQt(QMainWindow):
             )
             self.enhanced_answer_thread.start()
         else:
-            self.add_chat_message("系统", "搜索未找到相关结果")
+            self.add_chat_message("AI 系统", "搜索未找到相关结果")
             self.update_status("就绪")
     
     def on_enhanced_answer_generated(self, enhanced_answer):
         """处理增强答案生成完成"""
-        self.add_chat_message("助手(联网增强)", enhanced_answer)
+        self.add_chat_message("AI 助手(联网增强)", enhanced_answer)
         self.update_status("就绪")
     
     def filter_llm_response(self, message):
@@ -2817,7 +3156,7 @@ class OllamaSettingsQt(QMainWindow):
         timestamp = datetime.now().strftime("%H:%M:%S")
         
         # 如果是助手回复，先过滤多余内容
-        if sender in ["助手", "助手(联网增强)", self.get_text("assistant", "chat")]:
+        if sender in ["AI 助手", "AI 助手(联网增强)", self.get_text("assistant", "chat")]:
             message = self.filter_llm_response(message)
         
         # 检查是否使用WebView
@@ -2836,10 +3175,10 @@ class OllamaSettingsQt(QMainWindow):
             escaped_message = self.convert_urls_to_links(escaped_message)
             
             # 确定消息类型和样式
-            if sender == self.get_text("user", "chat") or sender == "用户":
+            if sender == self.get_text("user", "chat") or sender == "我":
                 message_class = "user-message"
                 bubble_class = "user-bubble"
-            elif sender in ["系统", "system"]:
+            elif sender in ["AI 系统", "system"]:
                 message_class = "system-message"
                 bubble_class = "system-bubble"
             else:
@@ -2911,48 +3250,65 @@ class OllamaSettingsQt(QMainWindow):
             
         except Exception as e:
             print(f"WebView添加消息时出错: {e}")
-            # 回退到QTextEdit模式
+            # 回退到QTextBrowser模式
             self.add_textedit_message(sender, message, timestamp)
     
     def add_textedit_message(self, sender, message, timestamp):
-        """添加消息到QTextEdit（回退模式）"""
+        """添加消息到QTextBrowser（回退模式）"""
         try:
-            # 转义HTML特殊字符
-            escaped_message = message.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
+            # 调试信息：打印sender的值
+            print(f"DEBUG: sender='{sender}', get_text('user', 'chat')='{self.get_text('user', 'chat')}'")
+            print(f"DEBUG: 是否匹配用户条件: {sender == self.get_text('user', 'chat') or sender == '用户' or sender == '我'}")
+            # 转义HTML特殊字符，保持换行
+            escaped_message = message.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            # 将换行符转换为HTML换行，但保持段落结构
+            escaped_message = escaped_message.replace('\n\n', '</p><p>').replace('\n', '<br>')
+            escaped_message = f'<p>{escaped_message}</p>' if escaped_message.strip() else ''
             
             # 将URL转换为可点击的链接
             escaped_message = self.convert_urls_to_links(escaped_message)
             
             # 根据发送者设置样式
-            if sender == self.get_text("user", "chat") or sender == "用户":
-                # 用户消息右对齐
+            if sender == self.get_text("user", "chat") or sender == "用户" or sender == "我":
+                # 用户消息右对齐，使用蓝色主题
+                print(f"DEBUG: 匹配用户消息，sender='{sender}'")
                 formatted_message = f"""
-                <div style="text-align: right; margin: 8px 0;">
-                    <div style="display: inline-block; max-width: 75%; background: linear-gradient(135deg, #e3f2fd, #bbdefb); color: #0d47a1; padding: 12px 16px; border-radius: 20px 20px 5px 20px; box-shadow: 0 2px 8px rgba(21,101,192,0.2); border: 1px solid #90caf9; text-align: left; word-wrap: break-word; font-weight: 500;">
-                        <div style="font-size: 11px; color: #1976d2; margin-bottom: 4px; font-weight: 500;">[{timestamp}] {sender}</div>
-                        <div style="font-size: 14px; line-height: 1.4; color: #0d47a1;">{escaped_message}</div>
-                    </div>
-                </div>
+                <table width="100%" style="margin: 12px 0; border-collapse: collapse;">
+                    <tr>
+                        <td style="text-align: right; padding: 0;">
+                            <div style="display: inline-block; max-width: 300px; background-color: #2196F3; color: #FFFFFF; padding: 10px 15px; border-radius: 18px 18px 5px 18px; box-shadow: 0 2px 10px rgba(33,150,243,0.3); text-align: left; word-wrap: break-word; font-family: 'Microsoft YaHei', sans-serif;">
+                                <div style="font-size: 10px; color: #FFFFFF; margin-bottom: 6px; font-weight: 500;">[{timestamp}] {sender}</div>
+                                <div style="font-size: 14px; line-height: 1.5; word-break: break-word; color: #FFFFFF;">{escaped_message}</div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
                 """
-            elif sender in ["系统", "system"]:
-                # 系统消息
+            elif sender in ["AI 系统", "system", "系统"]:
+                # 系统消息，居中显示
                 formatted_message = f"""
-                <div style="text-align: left; margin: 8px 0;">
-                    <div style="display: inline-block; max-width: 75%; background: linear-gradient(135deg, #fff3cd, #ffeaa7); color: #856404; padding: 12px 16px; border-radius: 20px 20px 20px 5px; box-shadow: 0 2px 8px rgba(133,100,4,0.2); border: 1px solid #ffeaa7; text-align: left; word-wrap: break-word;">
-                        <div style="font-size: 11px; color: #856404; margin-bottom: 4px; font-weight: 500;">[{timestamp}] {sender}</div>
-                        <div style="font-size: 14px; line-height: 1.4;">{escaped_message}</div>
+                <div style="text-align: center; margin: 12px 0; clear: both;">
+                    <div style="display: inline-block; max-width: 80%; background: linear-gradient(135deg, #FFF8E1, #FFF3C4); color: #F57F17; padding: 8px 12px; border-radius: 15px; border: 1px solid #FFE082; text-align: center; font-family: 'Microsoft YaHei', sans-serif; font-size: 12px;">
+                        <div style="font-weight: 500;">[{timestamp}] {sender}</div>
+                        <div style="margin-top: 4px; line-height: 1.4;">{escaped_message}</div>
                     </div>
                 </div>
+                <div style="height: 8px; clear: both;"></div>
                 """
             else:
-                # 助手消息左对齐
+                # 助手消息左对齐，使用灰色主题
+                print(f"DEBUG: 匹配AI消息，sender='{sender}'")
                 formatted_message = f"""
-                <div style="text-align: left; margin: 8px 0;">
-                    <div style="display: inline-block; max-width: 75%; background: linear-gradient(135deg, #f8f9fa, #e9ecef); color: #333; padding: 12px 16px; border-radius: 20px 20px 20px 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: left; word-wrap: break-word;">
-                        <div style="font-size: 11px; color: #666; margin-bottom: 4px; font-weight: 500;">[{timestamp}] {sender}</div>
-                        <div style="font-size: 14px; line-height: 1.4;">{escaped_message}</div>
-                    </div>
-                </div>
+                <table width="100%" style="margin: 12px 0; border-collapse: collapse;">
+                    <tr>
+                        <td style="text-align: left; padding: 0;">
+                            <div style="display: inline-block; max-width: 300px; background-color: #F5F5F5; color: #333333; padding: 10px 15px; border-radius: 18px 18px 18px 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 1px solid #E0E0E0; text-align: left; word-wrap: break-word; font-family: 'Microsoft YaHei', sans-serif;">
+                                <div style="font-size: 10px; color: #666666; margin-bottom: 6px; font-weight: 500;">[{timestamp}] {sender}</div>
+                                <div style="font-size: 14px; line-height: 1.5; word-break: break-word; color: #333333;">{escaped_message}</div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
                 """
             
             # 插入HTML
@@ -2966,9 +3322,9 @@ class OllamaSettingsQt(QMainWindow):
             scrollbar.setValue(scrollbar.maximum())
             
         except Exception as e:
-            print(f"QTextEdit添加消息时出错: {e}")
-            # 最后的回退：纯文本模式
-            simple_message = f"[{timestamp}] {sender}: {message}\n"
+            print(f"QTextBrowser添加消息时出错: {e}")
+            # 最后的回退：格式化纯文本模式
+            simple_message = f"\n[{timestamp}] {sender}:\n{message}\n" + "="*50 + "\n"
             self.chat_display.append(simple_message)
         
         # 保存到历史记录
@@ -2989,7 +3345,7 @@ class OllamaSettingsQt(QMainWindow):
             # WebView模式：重新初始化HTML
             self.init_chat_html()
         else:
-            # QTextEdit模式：直接清空
+            # QTextBrowser模式：直接清空
             self.chat_display.clear()
         
         # 清空消息列表（用于WebView）
@@ -3309,15 +3665,74 @@ class OllamaSettingsQt(QMainWindow):
             return False
 
 
+def execute_install_ollama():
+    """执行Ollama安装脚本"""
+    import platform
+    
+    # 检测系统类型
+    system = platform.system().lower()
+    
+    # 根据系统类型确定安装文件名
+    install_files = []
+    if system == "windows":
+        install_files = ["InstOlla.exe", "InstallOllama.bat"]
+    elif system in ["linux", "darwin"]:  # darwin是macOS
+        install_files = ["InstallOllama.sh"]
+    else:
+        print(f"不支持的系统类型: {system}")
+        return False
+    
+    # 查找安装文件
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    found_file = None
+    
+    for filename in install_files:
+        file_path = os.path.join(script_dir, filename)
+        if os.path.exists(file_path):
+            found_file = file_path
+            break
+    
+    if not found_file:
+        print(f"未找到适合当前系统({system})的安装文件: {install_files}")
+        return False
+    
+    try:
+        print(f"执行安装脚本: {found_file}")
+        
+        if system == "windows":
+            if found_file.endswith(".exe"):
+                # 执行.exe文件
+                subprocess.Popen([found_file], shell=False)
+            else:
+                # 执行.bat文件
+                subprocess.Popen([found_file], shell=True)
+        else:
+            # Linux/macOS执行.sh文件
+            subprocess.Popen(["/bin/bash", found_file])
+        
+        print("安装脚本已启动，程序即将退出")
+        return True
+        
+    except Exception as e:
+        print(f"执行安装脚本时出错: {e}")
+        return False
+
+
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='MiniAI - PyQt5 Version')
     parser.add_argument('-start', '--start', action='store_true', 
                        help='Start Ollama service in hidden mode and exit')
+    parser.add_argument('--installollama', action='store_true',
+                       help='Execute Ollama installation script and exit')
     
     args = parser.parse_args()
     
-    if args.start:
+    if args.installollama:
+        # 执行Ollama安装脚本
+        success = execute_install_ollama()
+        sys.exit(0 if success else 1)
+    elif args.start:
         # 启动Ollama服务
         success = OllamaSettingsQt.start_ollama_hidden()
         sys.exit(0 if success else 1)

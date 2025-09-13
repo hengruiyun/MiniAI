@@ -1,8 +1,11 @@
+# 核心依赖 - 必需
 requests>=2.31.0
-pathlib2>=2.3.7
-pyinstaller>=5.13.2
 PyQt5>=5.15.0
-PyQtWebEngine>=5.15.0
 beautifulsoup4>=4.12.0
-lxml>=4.9.0
-psutil>=5.9.0 
+psutil>=5.9.0
+
+# 搜索功能依赖 - 新增
+httpx>=0.24.0
+
+# 可选依赖 - 用于网页显示功能
+PyQtWebEngine>=5.15.0 

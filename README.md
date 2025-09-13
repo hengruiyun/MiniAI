@@ -141,6 +141,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 This project is built on top of Ollama, an incredible open-source platform that makes it possible for everyone to run AI models locally. Without the innovative work of the Ollama team, MiniAI would not exist. We appreciate their dedication to AI technology and making it accessible to developers and users worldwide.
 
+Thanks to the [MCP Server Freesearch](https://github.com/wzj177/mcp-server-freesearch) provided a search platform
+
 ---
 
 **MiniAI** - Making AI accessible on any Windows computer! 🚀

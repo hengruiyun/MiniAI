@@ -228,7 +228,11 @@ class MiniAI_i18n:
                 'select_delete_model': '请选择要删除的模型',
                 'confirm_delete': '确定要删除模型 {} 吗？',
                 'select_chat_model': '请选择一个模型',
-                'config_save_failed': '保存配置失败: {}'
+                'config_save_failed': '保存配置失败: {}',
+                'no_models_title': '没有找到模型',
+                'no_models_message': '您还没有安装任何AI模型。是否现在下载轻量级的qwen3:0.6b模型开始使用？\n\n这个模型只有0.6GB大小，非常适合初次体验。',
+                'download_now': '现在下载',
+                'download_later': '稍后下载'
             },
             'debug': {
                 'init_refresh_failed': '初始化时刷新模型列表失败: {}',
@@ -255,25 +259,40 @@ class MiniAI_i18n:
                 'header_labels': ['模型名称', '大小', '描述'],
                 'default_models': [
                     {
-                        'name': 'llama3.2:1b',
-                        'size': '1.3GB',
+                        "name": "qwen3:0.6b",
+                        "size": "0.6GB",
                         'description': 'Llama 3.2 1B - 轻量级对话模型'
                     },
                     {
-                        'name': 'deepseek-r1:1.5b',
-                        'size': '1.1GB',
-                        'description': 'DeepSeek R1 1.5B - 推理优化模型'
-                    },
-                    {
-                        'name': 'gemma3:1b',
-                        'size': '0.8GB',
-                        'description': 'Gemma 3 1B - Google开源模型'
-                    },
-                    {
-                        'name': 'qwen3:1.7b',
-                        'size': '1.4GB',
-                        'description': 'Qwen3 1.7B - 阿里巴巴通义千问'
-                    }
+                        "name": "qwen3:1.7b",
+                        "size": "1.4GB",
+                        "description": "Qwen3 1.7B - 阿里巴巴通义千问"
+                     },
+                        {
+                        "name": "gemma3:4b",
+                        "size": "3.3GB",
+                        "description": "Gemma3 4B - 大规模Google模型"
+                        },
+                        {
+                        "name": "qwen3:4b",
+                        "size": "2.5GB",
+                        "description": "Qwen3 4B - 通义千问大模型"
+                        },
+                        {
+                        "name": "gemma3:12b",
+                        "size": "8.1GB",
+                        "description": "Gemma3 12B - 大规模Google模型"
+                        },
+                        {
+                        "name": "qwen3:14b",
+                        "size": "9.3GB",
+                        "description": "Qwen3 14B - 通义千问大模型"
+                        },
+                        {
+                        "name": "gpt-oss:20b",
+                        "size": "14GB",
+                        "description": "OpenAI gpt - OpenAI最新对话模型"
+                        }
                 ]
             },
             
@@ -441,7 +460,11 @@ class MiniAI_i18n:
                 'select_delete_model': 'Please select a model to delete',
                 'confirm_delete': 'Are you sure you want to delete model {}?',
                 'select_chat_model': 'Please select a model',
-                'config_save_failed': 'Failed to save configuration: {}'
+                'config_save_failed': 'Failed to save configuration: {}',
+                'no_models_title': 'No Models Found',
+                'no_models_message': 'You haven\'t installed any AI models yet. Would you like to download the lightweight qwen3:0.6b model to get started?\n\nThis model is only 0.6GB in size and perfect for first-time experience.',
+                'download_now': 'Download Now',
+                'download_later': 'Download Later'
             },
             'debug': {
                 'init_refresh_failed': 'Failed to refresh model list during initialization: {}',
@@ -467,26 +490,7 @@ class MiniAI_i18n:
             'models': {
                 'header_labels': ['Model Name', 'Size', 'Description'],
                 'default_models': [
-                    {
-                        'name': 'llama3.2:1b',
-                        'size': '1.3GB',
-                        'description': 'Llama 3.2 1B - Lightweight conversation model'
-                    },
-                    {
-                        'name': 'deepseek-r1:1.5b',
-                        'size': '1.1GB',
-                        'description': 'DeepSeek R1 1.5B - Reasoning optimized model'
-                    },
-                    {
-                        'name': 'gemma3:1b',
-                        'size': '0.8GB',
-                        'description': 'Gemma 3 1B - Google open source model'
-                    },
-                    {
-                        'name': 'qwen3:1.7b',
-                        'size': '1.4GB',
-                        'description': 'Qwen3 1.7B - Alibaba Tongyi Qianwen'
-                    }
+                    
                 ]
             },
             

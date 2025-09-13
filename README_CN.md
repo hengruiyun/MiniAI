@@ -150,6 +150,8 @@
 本项目建立在 Ollama 的基础之上，这是一个令人难以置信的开源平台，让每个人都能在本地运行 AI 模型。没有Ollama 团队的创新工作，迷你AI 就不会存在。我们感谢他们对 AI 技术的奉献，以及让全世界的开发者和用户都能使用这项技术。
 
 
+感谢[wzj177开发的MCP Server Freesearch](https://github.com/wzj177/mcp-server-freesearch)提供了搜索平台
+
 ---
 
 **MiniAI** - 让 AI 在任何 Windows 电脑上都能使用！ 🚀
